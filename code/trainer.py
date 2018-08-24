@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 import torch.optim as optim
+import torchvision.utils as vutils
 import os
 import time
 
@@ -199,22 +200,30 @@ class GANTrainer(object):
                     self.summary_writer.add_scalars(main_tag="loss", tag_scalar_dict={
                         'D_loss':errD.cpu().item(),
                         'G_loss':errG_total.cpu().item()
-                    })
+                    }, global_step=count)
                     self.summary_writer.add_scalars(main_tag="D_loss", tag_scalar_dict={
                         "D_loss_real":errD_real,
                         "D_loss_wrong":errD_wrong,
                         "D_loss_fake":errD_fake
-                    })
+                    }, global_step=count)
                     self.summary_writer.add_scalars(main_tag="G_loss", tag_scalar_dict={
                         "G_loss":errG.cpu().item(),
                         "KL_loss":kl_loss.cpu().item()
-                    })
+                    }, global_step=count)
 
                     # save the image result for each epoch
                     inputs = (txt_embedding, fixed_noise)
                     lr_fake, fake, _, _ = \
                         nn.parallel.data_parallel(netG, inputs, self.gpus)
                     save_img_results(real_img_cpu, fake, epoch, self.image_dir)
+                    self.summary_writer.add_image(tag="fake_image", 
+                        img_tensor=vutils.make_grid(fake_imgs, normalize=True, range=(-1,1)),
+                        global_step=count
+                    )
+                    self.summary_writer.add_image(tag="real_image", 
+                        img_tensor=vutils.make_grid(real_img_cpu, normalize=True, range=(-1,1)),
+                        global_step=count
+                    )
                     if lr_fake is not None:
                         save_img_results(None, lr_fake, epoch, self.image_dir)
             end_t = time.time()
