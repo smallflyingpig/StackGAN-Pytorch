@@ -20,8 +20,9 @@ from miscc.utils import save_img_results, save_model
 from miscc.utils import KL_loss
 from miscc.utils import compute_discriminator_loss, compute_generator_loss
 
-from tensorboard import summary
-from tensorboard import FileWriter
+#from tensorboard import summary
+#from tensorboard import FileWriter
+from tensorboardX import SummaryWriter
 
 
 class GANTrainer(object):
@@ -33,7 +34,7 @@ class GANTrainer(object):
             mkdir_p(self.model_dir)
             mkdir_p(self.image_dir)
             mkdir_p(self.log_dir)
-            self.summary_writer = FileWriter(self.log_dir)
+            self.summary_writer = SummaryWriter(self.log_dir)
 
         self.max_epoch = cfg.TRAIN.MAX_EPOCH
         self.snapshot_interval = cfg.TRAIN.SNAPSHOT_INTERVAL
@@ -195,19 +196,19 @@ class GANTrainer(object):
 
                 count = count + 1
                 if i % 100 == 0:
-                    summary_D = summary.scalar('D_loss', errD.data[0])
-                    summary_D_r = summary.scalar('D_loss_real', errD_real)
-                    summary_D_w = summary.scalar('D_loss_wrong', errD_wrong)
-                    summary_D_f = summary.scalar('D_loss_fake', errD_fake)
-                    summary_G = summary.scalar('G_loss', errG.data[0])
-                    summary_KL = summary.scalar('KL_loss', kl_loss.data[0])
-
-                    self.summary_writer.add_summary(summary_D, count)
-                    self.summary_writer.add_summary(summary_D_r, count)
-                    self.summary_writer.add_summary(summary_D_w, count)
-                    self.summary_writer.add_summary(summary_D_f, count)
-                    self.summary_writer.add_summary(summary_G, count)
-                    self.summary_writer.add_summary(summary_KL, count)
+                    self.summary_writer.add_scalars(main_tag="loss", tag_scalar_dict={
+                        'D_loss':errD.cpu().item(),
+                        'G_loss':errG_total.cpu().item()
+                    })
+                    self.summary_writer.add_scalars(main_tag="D_loss", tag_scalar_dict={
+                        "D_loss_real":errD_real,
+                        "D_loss_wrong":errD_wrong,
+                        "D_loss_fake":errD_fake
+                    })
+                    self.summary_writer.add_scalars(main_tag="G_loss", tag_scalar_dict={
+                        "G_loss":errG.cpu().item(),
+                        "KL_loss":kl_loss.cpu().item()
+                    })
 
                     # save the image result for each epoch
                     inputs = (txt_embedding, fixed_noise)
@@ -222,14 +223,14 @@ class GANTrainer(object):
                      Total Time: %.2fsec
                   '''
                   % (epoch, self.max_epoch, i, len(data_loader),
-                     errD.data[0], errG.data[0], kl_loss.data[0],
+                     errD.cpu().item(), errG.cpu().item(), kl_loss.cpu().item(),
                      errD_real, errD_wrong, errD_fake, (end_t - start_t)))
             if epoch % self.snapshot_interval == 0:
                 save_model(netG, netD, epoch, self.model_dir)
         #
         save_model(netG, netD, self.max_epoch, self.model_dir)
         #
-        self.summary_writer.close()
+        
 
     def sample(self, datapath, stage=1):
         if stage == 1:
